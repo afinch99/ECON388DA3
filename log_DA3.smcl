@@ -1,0 +1,292 @@
+{smcl}
+{com}{sf}{ul off}{txt}{.-}
+      name:  {res}<unnamed>
+       {txt}log:  {res}C:\Users\afinch99\OneDrive - Brigham Young University\ECON 388\Data Assignment 3\log_DA3.smcl
+  {txt}log type:  {res}smcl
+ {txt}opened on:  {res}12 Apr 2022, 18:37:55
+{txt}
+{com}. 
+. /* I saved three data sets in that folder as CSV files. The first was the NYT 
+> COVID data that tracked COVID deaths and cases by county. The second was the 
+> census data showing population by county. Finally, the third was the Housing 
+> Price Data found on the fhfa website. I used excel to ensure that the FIPS 
+> variable was formatted the same for all of the data sets in order to make the 
+> merging process go smoothly. I have posted the final versions of all of the 
+> excel spreadsheets in my github folder that is linked to my final submission 
+> for this assignment */
+. 
+. import delimited using "County_Level_Population_2020", clear 
+{res}{txt}(encoding automatically selected: ISO-8859-1)
+{text}(10 vars, 3,143 obs)
+
+{com}. drop v10
+{txt}
+{com}. drop sumlev region division state county
+{txt}
+{com}. save "County_Level_Population_with_fips", replace 
+{txt}{p 0 4 2}
+file {bf}
+County_Level_Population_with_fips.dta{rm}
+saved
+{p_end}
+
+{com}. import delimited using "NYTcoviddeaths", clear 
+{res}{txt}(encoding automatically selected: ISO-8859-1)
+{text}(10 vars, 889,476 obs)
+
+{com}. 
+. /* Because the data set contained daily information regarding cases and deaths,
+> I needed to collapse the data so it was aggregated for the year 2020. */
+. 
+. collapse (sum) deaths cases, by (geoid)
+{res}{txt}
+{com}. rename geoid fips 
+{res}{txt}
+{com}. save "NYT_Deaths_bycountyfips", replace
+{txt}{p 0 4 2}
+file {bf}
+NYT_Deaths_bycountyfips.dta{rm}
+saved
+{p_end}
+
+{com}. use "NYT_Deaths_bycountyfips", clear 
+{txt}
+{com}. 
+. /* Next I merged the County Population data set to the NYT Covid deaths data 
+> set using the common variable fips, which is a unique idenfication code for 
+> each US County */
+. 
+. merge 1:1 fips using "County_Level_Population_with_fips"
+{res}
+{txt}{col 5}Result{col 33}Number of obs
+{col 5}{hline 41}
+{col 5}Not matched{col 30}{res}             152
+{txt}{col 9}from master{col 30}{res}             141{txt}  (_merge==1)
+{col 9}from using{col 30}{res}              11{txt}  (_merge==2)
+
+{col 5}Matched{col 30}{res}           3,132{txt}  (_merge==3)
+{col 5}{hline 41}
+
+{com}. keep if _merge==3
+{txt}(152 observations deleted)
+
+{com}. drop _merge
+{txt}
+{com}. save "Deaths_pop_merged", replace 
+{txt}{p 0 4 2}
+file {bf}
+Deaths_pop_merged.dta{rm}
+saved
+{p_end}
+
+{com}. 
+. /* Next I imported the third data set into STATA in order to prepare to
+> merge it with the other two */
+. 
+. import delimited "2020_2021_HPI_with_FIPS", clear 
+{res}{txt}(encoding automatically selected: UTF-8)
+{text}(7 vars, 1,045,801 obs)
+
+{com}. rename fipscode fips 
+{res}{txt}
+{com}. rename hpi hpiyearone
+{res}{txt}
+{com}. rename v5 hpiyeartwo
+{res}{txt}
+{com}. drop v6 v7
+{txt}
+{com}. gen hpichange = (hpiyeartwo - hpiyearone)
+{txt}(1,043,028 missing values generated)
+
+{com}. gen hpipercentchange = (hpichange / hpiyearone) * 100
+{txt}(1,043,028 missing values generated)
+
+{com}. save "HPI_with_fips", replace 
+{txt}{p 0 4 2}
+file {bf}
+HPI_with_fips.dta{rm}
+saved
+{p_end}
+
+{com}. use "Deaths_pop_merged", clear 
+{txt}
+{com}. merge 1:m fips using "HPI_with_fips"
+{res}
+{txt}{col 5}Result{col 33}Number of obs
+{col 5}{hline 41}
+{col 5}Not matched{col 30}{res}       1,043,395
+{txt}{col 9}from master{col 30}{res}             363{txt}  (_merge==1)
+{col 9}from using{col 30}{res}       1,043,032{txt}  (_merge==2)
+
+{col 5}Matched{col 30}{res}           2,769{txt}  (_merge==3)
+{col 5}{hline 41}
+
+{com}. keep if _merge == 3 
+{txt}(1,043,395 observations deleted)
+
+{com}. drop _merge 
+{txt}
+{com}. rename popestimate2020 population
+{res}{txt}
+{com}. gen mortalityrate = (deaths/population)*100
+{txt}
+{com}. save "FinalDataSetMerged", replace 
+{txt}{p 0 4 2}
+file {bf}
+FinalDataSetMerged.dta{rm}
+saved
+{p_end}
+
+{com}. 
+. /* Now that the data set had been merged, I needed to generate a new variable 
+> for the mortality rate */
+. 
+. reg hpichange mortalityrate
+
+{txt}      Source {c |}       SS           df       MS      Number of obs   ={res}     2,768
+{txt}{hline 13}{c +}{hline 34}   F(1, 2766)      = {res}   193.15
+{txt}       Model {c |} {res} 170413.061         1  170413.061   {txt}Prob > F        ={res}    0.0000
+{txt}    Residual {c |} {res}  2440454.8     2,766  882.304698   {txt}R-squared       ={res}    0.0653
+{txt}{hline 13}{c +}{hline 34}   Adj R-squared   ={res}    0.0649
+{txt}       Total {c |} {res} 2610867.86     2,767  943.573494   {txt}Root MSE        =   {res} 29.704
+
+{txt}{hline 14}{c TT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{col 1}    hpichange{col 15}{c |} Coefficient{col 27}  Std. err.{col 39}      t{col 47}   P>|t|{col 55}     [95% con{col 68}f. interval]
+{hline 14}{c +}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+mortalityrate {c |}{col 15}{res}{space 2}-97.96001{col 27}{space 2} 7.048662{col 38}{space 1}  -13.90{col 47}{space 3}0.000{col 55}{space 4}-111.7812{col 68}{space 3}-84.13884
+{txt}{space 8}_cons {c |}{col 15}{res}{space 2} 47.12397{col 27}{space 2} .9748524{col 38}{space 1}   48.34{col 47}{space 3}0.000{col 55}{space 4} 45.21246{col 68}{space 3} 49.03548
+{txt}{hline 14}{c BT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{res}{txt}
+{com}. twoway scatter hpichange mortalityrate || lfit hpichange mortalityrate 
+{res}{txt}
+{com}. sum mortalityrate hpichange deaths 
+
+{txt}    Variable {c |}        Obs        Mean    Std. dev.       Min        Max
+{hline 13}{c +}{hline 57}
+mortalityr~e {c |}{res}      2,769    .1127488    .0800976          0   .6801275
+{txt}{space 3}hpichange {c |}{res}      2,768    36.07916    30.71764     -14.03   213.5299
+{txt}{space 6}deaths {c |}{res}      2,769     113.927    381.6499          0      10345
+{txt}
+{com}. encode(state), gen(statenum)
+{txt}
+{com}. reg hpichange mortalityrate i.statenum 
+
+{txt}      Source {c |}       SS           df       MS      Number of obs   ={res}     2,768
+{txt}{hline 13}{c +}{hline 34}   F(51, 2716)     = {res}    50.71
+{txt}       Model {c |} {res} 1273531.43        51  24971.2045   {txt}Prob > F        ={res}    0.0000
+{txt}    Residual {c |} {res} 1337336.43     2,716   492.39191   {txt}R-squared       ={res}    0.4878
+{txt}{hline 13}{c +}{hline 34}   Adj R-squared   ={res}    0.4782
+{txt}       Total {c |} {res} 2610867.86     2,767  943.573494   {txt}Root MSE        =   {res}  22.19
+
+{txt}{hline 14}{c TT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{col 1}    hpichange{col 15}{c |} Coefficient{col 27}  Std. err.{col 39}      t{col 47}   P>|t|{col 55}     [95% con{col 68}f. interval]
+{hline 14}{c +}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+mortalityrate {c |}{col 15}{res}{space 2}-47.70955{col 27}{space 2}   6.1511{col 38}{space 1}   -7.76{col 47}{space 3}0.000{col 55}{space 4}-59.77086{col 68}{space 3}-35.64824
+{txt}{space 13} {c |}
+{space 5}statenum {c |}
+{space 10}AL  {c |}{col 15}{res}{space 2} 2.007291{col 27}{space 2} 8.346792{col 38}{space 1}    0.24{col 47}{space 3}0.810{col 55}{space 4}-14.35941{col 68}{space 3}   18.374
+{txt}{space 10}AR  {c |}{col 15}{res}{space 2} 2.765203{col 27}{space 2} 8.331273{col 38}{space 1}    0.33{col 47}{space 3}0.740{col 55}{space 4}-13.57107{col 68}{space 3} 19.10148
+{txt}{space 10}AZ  {c |}{col 15}{res}{space 2} 64.63117{col 27}{space 2} 9.881641{col 38}{space 1}    6.54{col 47}{space 3}0.000{col 55}{space 4} 45.25487{col 68}{space 3} 84.00747
+{txt}{space 10}CA  {c |}{col 15}{res}{space 2} 85.56048{col 27}{space 2} 8.371176{col 38}{space 1}   10.22{col 47}{space 3}0.000{col 55}{space 4} 69.14596{col 68}{space 3}  101.975
+{txt}{space 10}CO  {c |}{col 15}{res}{space 2} 44.10104{col 27}{space 2} 8.369633{col 38}{space 1}    5.27{col 47}{space 3}0.000{col 55}{space 4} 27.68955{col 68}{space 3} 60.51253
+{txt}{space 10}CT  {c |}{col 15}{res}{space 2} 46.62065{col 27}{space 2} 11.11889{col 38}{space 1}    4.19{col 47}{space 3}0.000{col 55}{space 4} 24.81832{col 68}{space 3} 68.42299
+{txt}{space 10}DC  {c |}{col 15}{res}{space 2} 82.60338{col 27}{space 2} 23.54314{col 38}{space 1}    3.51{col 47}{space 3}0.000{col 55}{space 4} 36.43911{col 68}{space 3} 128.7677
+{txt}{space 10}DE  {c |}{col 15}{res}{space 2} 31.19522{col 27}{space 2} 15.03131{col 38}{space 1}    2.08{col 47}{space 3}0.038{col 55}{space 4} 1.721253{col 68}{space 3} 60.66919
+{txt}{space 10}FL  {c |}{col 15}{res}{space 2} 44.99365{col 27}{space 2} 8.342566{col 38}{space 1}    5.39{col 47}{space 3}0.000{col 55}{space 4} 28.63523{col 68}{space 3} 61.35207
+{txt}{space 10}GA  {c |}{col 15}{res}{space 2} 12.32749{col 27}{space 2} 8.110967{col 38}{space 1}    1.52{col 47}{space 3}0.129{col 55}{space 4}-3.576803{col 68}{space 3} 28.23178
+{txt}{space 10}HI  {c |}{col 15}{res}{space 2} 43.65485{col 27}{space 2} 13.58849{col 38}{space 1}    3.21{col 47}{space 3}0.001{col 55}{space 4} 17.01002{col 68}{space 3} 70.29967
+{txt}{space 10}IA  {c |}{col 15}{res}{space 2} 3.090689{col 27}{space 2} 8.202894{col 38}{space 1}    0.38{col 47}{space 3}0.706{col 55}{space 4}-12.99386{col 68}{space 3} 19.17523
+{txt}{space 10}ID  {c |}{col 15}{res}{space 2} 53.05938{col 27}{space 2} 8.568773{col 38}{space 1}    6.19{col 47}{space 3}0.000{col 55}{space 4}  36.2574{col 68}{space 3} 69.86135
+{txt}{space 10}IL  {c |}{col 15}{res}{space 2} .8743661{col 27}{space 2} 8.213729{col 38}{space 1}    0.11{col 47}{space 3}0.915{col 55}{space 4}-15.23143{col 68}{space 3} 16.98016
+{txt}{space 10}IN  {c |}{col 15}{res}{space 2} 14.25893{col 27}{space 2} 8.207548{col 38}{space 1}    1.74{col 47}{space 3}0.082{col 55}{space 4}-1.834739{col 68}{space 3}  30.3526
+{txt}{space 10}KS  {c |}{col 15}{res}{space 2} 4.270984{col 27}{space 2} 8.290793{col 38}{space 1}    0.52{col 47}{space 3}0.606{col 55}{space 4}-11.98592{col 68}{space 3} 20.52788
+{txt}{space 10}KY  {c |}{col 15}{res}{space 2} 1.766568{col 27}{space 2} 8.139858{col 38}{space 1}    0.22{col 47}{space 3}0.828{col 55}{space 4}-14.19437{col 68}{space 3} 17.72751
+{txt}{space 10}LA  {c |}{col 15}{res}{space 2} .0111604{col 27}{space 2} 8.411686{col 38}{space 1}    0.00{col 47}{space 3}0.999{col 55}{space 4}-16.48279{col 68}{space 3} 16.50511
+{txt}{space 10}MA  {c |}{col 15}{res}{space 2} 73.98765{col 27}{space 2} 9.866477{col 38}{space 1}    7.50{col 47}{space 3}0.000{col 55}{space 4} 54.64108{col 68}{space 3} 93.33421
+{txt}{space 10}MD  {c |}{col 15}{res}{space 2} 27.16695{col 27}{space 2} 9.070267{col 38}{space 1}    3.00{col 47}{space 3}0.003{col 55}{space 4} 9.381627{col 68}{space 3} 44.95227
+{txt}{space 10}ME  {c |}{col 15}{res}{space 2} 23.46172{col 27}{space 2} 9.608574{col 38}{space 1}    2.44{col 47}{space 3}0.015{col 55}{space 4} 4.620863{col 68}{space 3} 42.30257
+{txt}{space 10}MI  {c |}{col 15}{res}{space 2} 23.21893{col 27}{space 2} 8.236005{col 38}{space 1}    2.82{col 47}{space 3}0.005{col 55}{space 4} 7.069459{col 68}{space 3}  39.3684
+{txt}{space 10}MN  {c |}{col 15}{res}{space 2}  10.6205{col 27}{space 2} 8.215976{col 38}{space 1}    1.29{col 47}{space 3}0.196{col 55}{space 4}-5.489692{col 68}{space 3}  26.7307
+{txt}{space 10}MO  {c |}{col 15}{res}{space 2}  5.62559{col 27}{space 2}  8.15171{col 38}{space 1}    0.69{col 47}{space 3}0.490{col 55}{space 4}-10.35859{col 68}{space 3} 21.60977
+{txt}{space 10}MS  {c |}{col 15}{res}{space 2} .6120541{col 27}{space 2} 8.367146{col 38}{space 1}    0.07{col 47}{space 3}0.942{col 55}{space 4}-15.79456{col 68}{space 3} 17.01867
+{txt}{space 10}MT  {c |}{col 15}{res}{space 2} 27.93221{col 27}{space 2} 8.584997{col 38}{space 1}    3.25{col 47}{space 3}0.001{col 55}{space 4} 11.09842{col 68}{space 3}   44.766
+{txt}{space 10}NC  {c |}{col 15}{res}{space 2}  16.5194{col 27}{space 2} 8.165845{col 38}{space 1}    2.02{col 47}{space 3}0.043{col 55}{space 4} .5074983{col 68}{space 3}  32.5313
+{txt}{space 10}ND  {c |}{col 15}{res}{space 2}-.2020843{col 27}{space 2} 8.989853{col 38}{space 1}   -0.02{col 47}{space 3}0.982{col 55}{space 4}-17.82973{col 68}{space 3} 17.42556
+{txt}{space 10}NE  {c |}{col 15}{res}{space 2}    5.329{col 27}{space 2} 8.328562{col 38}{space 1}    0.64{col 47}{space 3}0.522{col 55}{space 4}-11.00196{col 68}{space 3} 21.65996
+{txt}{space 10}NH  {c |}{col 15}{res}{space 2} 40.77978{col 27}{space 2} 10.52649{col 38}{space 1}    3.87{col 47}{space 3}0.000{col 55}{space 4} 20.13904{col 68}{space 3} 61.42053
+{txt}{space 10}NJ  {c |}{col 15}{res}{space 2}  68.1339{col 27}{space 2} 9.283475{col 38}{space 1}    7.34{col 47}{space 3}0.000{col 55}{space 4} 49.93051{col 68}{space 3} 86.33729
+{txt}{space 10}NM  {c |}{col 15}{res}{space 2} 16.31516{col 27}{space 2} 8.963355{col 38}{space 1}    1.82{col 47}{space 3}0.069{col 55}{space 4}-1.260525{col 68}{space 3} 33.89085
+{txt}{space 10}NV  {c |}{col 15}{res}{space 2} 41.90891{col 27}{space 2} 9.723252{col 38}{space 1}    4.31{col 47}{space 3}0.000{col 55}{space 4} 22.84319{col 68}{space 3} 60.97463
+{txt}{space 10}NY  {c |}{col 15}{res}{space 2} 20.50142{col 27}{space 2} 8.384742{col 38}{space 1}    2.45{col 47}{space 3}0.015{col 55}{space 4}   4.0603{col 68}{space 3} 36.94254
+{txt}{space 10}OH  {c |}{col 15}{res}{space 2} 17.33659{col 27}{space 2}  8.20628{col 38}{space 1}    2.11{col 47}{space 3}0.035{col 55}{space 4} 1.245409{col 68}{space 3} 33.42778
+{txt}{space 10}OK  {c |}{col 15}{res}{space 2} 3.465972{col 27}{space 2} 8.350604{col 38}{space 1}    0.42{col 47}{space 3}0.678{col 55}{space 4}-12.90821{col 68}{space 3} 19.84015
+{txt}{space 10}OR  {c |}{col 15}{res}{space 2}  70.6013{col 27}{space 2} 8.720742{col 38}{space 1}    8.10{col 47}{space 3}0.000{col 55}{space 4} 53.50134{col 68}{space 3} 87.70126
+{txt}{space 10}PA  {c |}{col 15}{res}{space 2} 11.33645{col 27}{space 2} 8.345049{col 38}{space 1}    1.36{col 47}{space 3}0.174{col 55}{space 4}-5.026838{col 68}{space 3} 27.69974
+{txt}{space 10}RI  {c |}{col 15}{res}{space 2} 94.75014{col 27}{space 2} 12.66304{col 38}{space 1}    7.48{col 47}{space 3}0.000{col 55}{space 4} 69.91998{col 68}{space 3} 119.5803
+{txt}{space 10}SC  {c |}{col 15}{res}{space 2} 15.18942{col 27}{space 2}  8.54462{col 38}{space 1}    1.78{col 47}{space 3}0.076{col 55}{space 4}-1.565195{col 68}{space 3} 31.94403
+{txt}{space 10}SD  {c |}{col 15}{res}{space 2} 10.33561{col 27}{space 2} 8.670034{col 38}{space 1}    1.19{col 47}{space 3}0.233{col 55}{space 4}-6.664921{col 68}{space 3} 27.33614
+{txt}{space 10}TN  {c |}{col 15}{res}{space 2} 18.23185{col 27}{space 2} 8.205092{col 38}{space 1}    2.22{col 47}{space 3}0.026{col 55}{space 4} 2.142993{col 68}{space 3}  34.3207
+{txt}{space 10}TX  {c |}{col 15}{res}{space 2}  18.2841{col 27}{space 2} 8.055775{col 38}{space 1}    2.27{col 47}{space 3}0.023{col 55}{space 4} 2.488029{col 68}{space 3} 34.08017
+{txt}{space 10}UT  {c |}{col 15}{res}{space 2} 54.83739{col 27}{space 2} 8.933783{col 38}{space 1}    6.14{col 47}{space 3}0.000{col 55}{space 4} 37.31969{col 68}{space 3} 72.35509
+{txt}{space 10}VA  {c |}{col 15}{res}{space 2}  12.0316{col 27}{space 2} 8.095643{col 38}{space 1}    1.49{col 47}{space 3}0.137{col 55}{space 4}-3.842645{col 68}{space 3} 27.90584
+{txt}{space 10}VT  {c |}{col 15}{res}{space 2} 13.24002{col 27}{space 2} 9.834631{col 38}{space 1}    1.35{col 47}{space 3}0.178{col 55}{space 4}-6.044098{col 68}{space 3} 32.52413
+{txt}{space 10}WA  {c |}{col 15}{res}{space 2} 82.12616{col 27}{space 2} 8.614142{col 38}{space 1}    9.53{col 47}{space 3}0.000{col 55}{space 4} 65.23522{col 68}{space 3} 99.01709
+{txt}{space 10}WI  {c |}{col 15}{res}{space 2}   13.988{col 27}{space 2} 8.288216{col 38}{space 1}    1.69{col 47}{space 3}0.092{col 55}{space 4}-2.263847{col 68}{space 3} 30.23985
+{txt}{space 10}WV  {c |}{col 15}{res}{space 2}-5.041096{col 27}{space 2} 8.585996{col 38}{space 1}   -0.59{col 47}{space 3}0.557{col 55}{space 4}-21.87684{col 68}{space 3} 11.79465
+{txt}{space 10}WY  {c |}{col 15}{res}{space 2} 16.74931{col 27}{space 2} 9.169955{col 38}{space 1}    1.83{col 47}{space 3}0.068{col 55}{space 4}-1.231486{col 68}{space 3}  34.7301
+{txt}{space 13} {c |}
+{space 8}_cons {c |}{col 15}{res}{space 2} 23.32745{col 27}{space 2}  7.84591{col 38}{space 1}    2.97{col 47}{space 3}0.003{col 55}{space 4} 7.942888{col 68}{space 3}   38.712
+{txt}{hline 14}{c BT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{res}{txt}
+{com}. sum hpipercentchange
+
+{txt}    Variable {c |}        Obs        Mean    Std. dev.       Min        Max
+{hline 13}{c +}{hline 57}
+hpipercent~e {c |}{res}      2,768    10.66021     4.41307  -8.810599   47.06488
+{txt}
+{com}. gen logmortalityrate = ln(mortalityrate)
+{txt}(38 missing values generated)
+
+{com}. reg hpipercentchange logmortalityrate
+
+{txt}      Source {c |}       SS           df       MS      Number of obs   ={res}     2,730
+{txt}{hline 13}{c +}{hline 34}   F(1, 2728)      = {res}   102.52
+{txt}       Model {c |} {res}  1915.4953         1   1915.4953   {txt}Prob > F        ={res}    0.0000
+{txt}    Residual {c |} {res}  50971.148     2,728  18.6844384   {txt}R-squared       ={res}    0.0362
+{txt}{hline 13}{c +}{hline 34}   Adj R-squared   ={res}    0.0359
+{txt}       Total {c |} {res} 52886.6433     2,729  19.3794955   {txt}Root MSE        =   {res} 4.3225
+
+{txt}{hline 17}{c TT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{col 1}hpipercentchange{col 18}{c |} Coefficient{col 30}  Std. err.{col 42}      t{col 50}   P>|t|{col 58}     [95% con{col 71}f. interval]
+{hline 17}{c +}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+logmortalityrate {c |}{col 18}{res}{space 2}-1.096453{col 30}{space 2} .1082903{col 41}{space 1}  -10.13{col 50}{space 3}0.000{col 58}{space 4}-1.308792{col 71}{space 3}-.8841138
+{txt}{space 11}_cons {c |}{col 18}{res}{space 2} 8.012547{col 30}{space 2} .2744815{col 41}{space 1}   29.19{col 50}{space 3}0.000{col 58}{space 4} 7.474335{col 71}{space 3}  8.55076
+{txt}{hline 17}{c BT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{res}{txt}
+{com}. gen loghpichange = ln(hpichange)
+{txt}(28 missing values generated)
+
+{com}. reg loghpichange logmortalityrate
+
+{txt}      Source {c |}       SS           df       MS      Number of obs   ={res}     2,704
+{txt}{hline 13}{c +}{hline 34}   F(1, 2702)      = {res}   219.38
+{txt}       Model {c |} {res} 134.639578         1  134.639578   {txt}Prob > F        ={res}    0.0000
+{txt}    Residual {c |} {res} 1658.26223     2,702   .61371659   {txt}R-squared       ={res}    0.0751
+{txt}{hline 13}{c +}{hline 34}   Adj R-squared   ={res}    0.0748
+{txt}       Total {c |} {res}  1792.9018     2,703  .663300704   {txt}Root MSE        =   {res}  .7834
+
+{txt}{hline 17}{c TT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{col 1}    loghpichange{col 18}{c |} Coefficient{col 30}  Std. err.{col 42}      t{col 50}   P>|t|{col 58}     [95% con{col 71}f. interval]
+{hline 17}{c +}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+logmortalityrate {c |}{col 18}{res}{space 2}-.2923509{col 30}{space 2}  .019738{col 41}{space 1}  -14.81{col 50}{space 3}0.000{col 58}{space 4} -.331054{col 71}{space 3}-.2536479
+{txt}{space 11}_cons {c |}{col 18}{res}{space 2}   2.5953{col 30}{space 2} .0500898{col 41}{space 1}   51.81{col 50}{space 3}0.000{col 58}{space 4} 2.497081{col 71}{space 3} 2.693518
+{txt}{hline 17}{c BT}{hline 11}{hline 11}{hline 9}{hline 8}{hline 13}{hline 12}
+{res}{txt}
+{com}. 
+. 
+. 
+. 
+. 
+{txt}end of do-file
+
+{com}. exit, clear
