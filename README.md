@@ -21,3 +21,6 @@ AdamFinchDA3.do is my STATA do file that can be used to duplicate my work.
 
 
 log_DA3.smcl is the log that tracked all of my STATA activity. 
+
+
+Finally, DA3 Write Up.docx is my written memo summarizing my process and findings. 
